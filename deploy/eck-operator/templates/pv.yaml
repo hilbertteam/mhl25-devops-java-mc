@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: elasticsearch-data-mhl-elastic-es-masters-0
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain  # Данные не удаляются после удаления PVC
+  storageClassName: localpath
+  local:
+    path: /mnt/data  # Путь на ноде (должен существовать)
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ubuntu-jpoint  # Замените на имя ноды (kubectl get nodes)
+---
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: elasticsearch-logs-mhl-elastic-es-masters-0
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain  # Данные не удаляются после удаления PVC
+  storageClassName: localpath
+  local:
+    path: /mnt/logs  # Путь на ноде (должен существовать)
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ubuntu-jpoint  # Замените на имя ноды (kubectl get nodes)

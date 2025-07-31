@@ -1,0 +1,75 @@
+---
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: mhl-elastic
+  namespace: mhl
+spec:
+  version: 7.17.4
+  image: elasticsearch:7.17.4
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
+  nodeSets:
+    - name: masters
+      count: 1
+      config:
+        node.roles: ["master"]
+        xpack.security.authc:
+          anonymous:
+            username: anonymous
+            roles: superuser, kibana_admin
+            authz_exception: false
+        xpack.security.enabled: false
+        xpack.security.transport.ssl.enabled: false        
+      podTemplate:
+        spec:
+          initContainers:
+            - name: sysctl
+              securityContext:
+                privileged: true
+                runAsUser: 0
+              command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']        
+          containers:          
+            - name: elasticsearch
+              env:
+                - name: ES_JAVA_OPTS
+                  value: "-Des.search.ignore_awareness_attributes=true"                
+              readinessProbe:
+                  exec:
+                    command:
+                    - bash
+                    - -c
+                    - /mnt/elastic-internal/scripts/readiness-probe-script.sh
+                  failureThreshold: 3
+                  initialDelaySeconds: 30
+                  periodSeconds: 12
+                  successThreshold: 1
+                  timeoutSeconds: 20
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 1              
+                limits:
+                  memory: 1Gi
+                  cpu: 1
+      volumeClaimTemplates:
+        - metadata:
+            name: elasticsearch-data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            storageClassName: localpath
+        - metadata:
+            name: elasticsearch-logs
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            storageClassName: localpath            
