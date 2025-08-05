@@ -49,8 +49,8 @@ spec:
                   timeoutSeconds: 20
               resources:
                 limits:
-                  memory: 1Gi
-                  cpu: 1
+                  memory: 3Gi
+                  cpu: 3
       volumeClaimTemplates:
         - metadata:
             name: elasticsearch-data

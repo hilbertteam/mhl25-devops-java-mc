@@ -1,0 +1,204 @@
+# Values файл для тестирования чарта с Spring Boot PetClinic
+# Spring Boot PetClinic - популярное демо приложение с UI
+
+# Application configuration
+app:
+  name: petclinic
+  image:
+    repository: springcommunity/spring-petclinic-rest
+    tag: "latest"
+    pullPolicy: Always
+  
+  # Container port configuration
+  port:
+    container: 8080
+    service: 80
+  
+  # Health check configuration
+  healthCheck:
+    enabled: true
+    path: /petclinic/actuator/health
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+# Java options configuration
+java:
+  opts:
+    # JVM memory settings
+    - "-Xms512m"
+    - "-Xmx1g"
+    - "-XX:+UseG1GC"
+    - "-XX:MaxGCPauseMillis=200"
+    - "-XX:+StartAttachListener"
+    - "-XX:+PrintFlagsFinal"
+
+  
+  # Additional environment variables
+  env:
+    - name: SPRING_PROFILES_ACTIVE
+      value: "h2,spring-data-jpa"
+    - name: LOG_LEVEL
+      value: "INFO"
+    - name: TZ
+      value: "UTC"
+    - name: SPRING_DATA_JPA_REPOSITORIES_ENABLED
+      value: "true"      
+
+# Deployment configuration
+deployment:
+  replicas: 1
+  
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Pod security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  # Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 1000
+  
+  # Pod annotations for monitoring
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/petclinic/actuator/prometheus"
+
+# Service configuration
+service:
+  type: ClusterIP
+  annotations: {}
+  labels: {}
+
+# ConfigMap for PetClinic configuration
+configMap:
+  enabled: true
+  data:
+    application.properties: |
+      server.port=8080
+      server.servlet.context-path=/petclinic/
+
+      # database init, supports hsqldb, mysql and postgres too
+      database=h2
+      # Ensures schema & data reload on every restart (good for local dev)
+      spring.sql.init.mode=always
+      spring.sql.init.schema-locations=classpath*:db/${database}/schema.sql
+      spring.sql.init.data-locations=classpath*:db/${database}/data.sql
+
+      spring.messages.basename=messages/messages
+      spring.jpa.open-in-view=false
+      
+      management.endpoints.web.exposure.include=health,info,metrics,prometheus,env
+      management.endpoint.metrics.enabled=true
+
+      # OpenAPI/Swagger UI (Defaults to true)
+      #springdoc.api-docs.enabled=true
+      #springdoc.swagger-ui.enabled=true
+
+      #logging.level.org.springframework=INFO
+      logging.level.org.springframework=DEBUG
+
+      #logging.level.org.hibernate.SQL=DEBUG
+      #logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+      # enable the desired authentication type
+      # by default the authentication is disabled
+      petclinic.security.enable=false
+
+
+# JMX Exporter configuration for JVM metrics
+jmxExporter:
+  enabled: true
+  
+  # JMX Exporter port
+  port: 9404
+  
+  # JMX Exporter configuration
+  config:
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    rules:
+      # JVM metrics
+      - pattern: "java.lang<type=GarbageCollector, name=(.+)><>CollectionCount"
+        name: "jvm_gc_collection_count"
+        type: COUNTER
+        labels:
+          gc: "$1"
+      - pattern: "java.lang<type=GarbageCollector, name=(.+)><>CollectionTime"
+        name: "jvm_gc_collection_time_seconds"
+        type: COUNTER
+        labels:
+          gc: "$1"
+      - pattern: "java.lang<type=Memory><HeapMemoryUsage><Used>"
+        name: "jvm_memory_heap_used_bytes"
+        type: GAUGE
+      - pattern: "java.lang<type=Memory><HeapMemoryUsage><Max>"
+        name: "jvm_memory_heap_max_bytes"
+        type: GAUGE
+      - pattern: "java.lang<type=Memory><NonHeapMemoryUsage><Used>"
+        name: "jvm_memory_nonheap_used_bytes"
+        type: GAUGE
+      - pattern: "java.lang<type=Threading><ThreadCount>"
+        name: "jvm_threads_current"
+        type: GAUGE
+      - pattern: "java.lang<type=Threading><PeakThreadCount>"
+        name: "jvm_threads_peak"
+        type: GAUGE
+      # Application specific metrics
+      - pattern: ".*"
+
+# PodMonitor configuration for Prometheus Operator
+podMonitor:
+  enabled: true
+  
+  # PodMonitor metadata
+  interval: 30s
+  scrapeTimeout: 10s
+  
+  # PodMonitor labels
+  labels:
+    release: prometheus
+  
+  # PodMonitor annotations
+  annotations: {}
+  
+  # PodMonitor selector
+  selector:
+    matchLabels: {}
+  
+  # PodMonitor namespace selector
+  namespaceSelector:
+    matchNames: []
+  
+  # PodMonitor endpoints
+  endpoints:
+    - port: jmx-metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+      honorTimestamps: true
+
+# Service account configuration
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {} 
+
+secret:
+  enabled: false

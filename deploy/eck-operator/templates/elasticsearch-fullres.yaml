@@ -53,7 +53,7 @@ spec:
                   cpu: 1              
                 limits:
                   memory: 1Gi
-                  cpu: 1
+                  cpu: 3
       volumeClaimTemplates:
         - metadata:
             name: elasticsearch-data

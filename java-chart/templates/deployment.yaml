@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "java-app.fullname" . }}
+  labels:
+    {{- include "java-app.labels" . | nindent 4 }}
+  {{- with .Values.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.deployment.replicas }}
+  selector:
+    matchLabels:
+      {{- include "java-app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.deployment.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "java-app.selectorLabels" . | nindent 8 }}
+        {{- with .Values.deployment.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "java-app.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.deployment.securityContext | nindent 8 }}
+      {{- if .Values.jmxExporter.enabled }}
+      initContainers:
+        - name: jmx-agent-downloader
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              curl -L -o /tmp/jmx_prometheus_javaagent.jar https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.17.2/jmx_prometheus_javaagent-0.17.2.jar
+              cp /tmp/jmx_prometheus_javaagent.jar /jmx-agent/
+          volumeMounts:
+            - name: jmx-agent
+              mountPath: /jmx-agent
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.app.port.container }}
+              protocol: TCP
+            {{- if .Values.jmxExporter.enabled }}
+            - name: jmx-metrics
+              containerPort: {{ .Values.jmxExporter.port }}
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.app.healthCheck.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.app.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.app.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.app.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.app.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.app.healthCheck.failureThreshold }}
+            successThreshold: {{ .Values.app.healthCheck.successThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.app.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.app.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.app.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.app.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.app.healthCheck.failureThreshold }}
+            successThreshold: {{ .Values.app.healthCheck.successThreshold }}
+          {{- end }}
+          env:
+            {{- if .Values.java.opts }}
+            - name: _JAVA_OPTIONS
+              value: {{ join " " .Values.java.opts | quote }}
+            {{- end }}
+            {{- if .Values.jmxExporter.enabled }}
+            - name: JAVA_TOOL_OPTIONS
+              value: "-javaagent:/opt/jmx_prometheus_javaagent.jar={{ .Values.jmxExporter.port }}:/opt/config.yaml -Dloader.path=/shared-libs"
+            {{- end }}
+            {{- with .Values.java.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.secret.enabled }}
+            {{- range $key, $value := .Values.secret.data }}
+            - name: {{ $key | upper | replace "-" "_" | replace "." "_" }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "java-app.fullname" $ }}-secret
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.deployment.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.deployment.containerSecurityContext | nindent 12 }}
+          {{- if .Values.jmxExporter.enabled }}
+          volumeMounts:
+            {{- if .Values.jmxExporter.enabled }}
+            - name: jmx-config
+              mountPath: /opt/config.yaml
+              subPath: config.yaml
+            - name: jmx-agent
+              mountPath: /opt/jmx_prometheus_javaagent.jar
+              subPath: jmx_prometheus_javaagent.jar
+            - name: shared-libs
+              mountPath: /shared-libs
+            {{- end }}
+            {{- if .Values.configMap.enabled }}
+            - name: application-yaml
+              mountPath: /app/resources/application.properties
+              subPath: application.properties
+            {{- end }}
+
+            - name: tmp-volume
+              mountPath: /tmp
+          {{- end }}
+
+      volumes:
+        {{- if .Values.configMap.enabled }}
+        - name: application-yaml
+          configMap:
+            name: {{ include "java-app.fullname" $ }}-config
+        {{- end }}
+
+        {{- if .Values.jmxExporter.enabled }}
+        - name: jmx-config
+          configMap:
+            name: {{ include "java-app.fullname" . }}-jmx-config
+        - name: jmx-agent
+          emptyDir: {}
+        - name: shared-libs
+          emptyDir: {}          
+        {{- end }}
+        - name: tmp-volume
+          emptyDir: {}
+      {{- with .Values.deployment.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.deployment.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.deployment.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }} 

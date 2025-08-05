@@ -1,0 +1,12 @@
+apiVersion: v2
+name: java-app
+description: A universal Helm chart for Java applications
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/your-org/java-chart
+sources:
+  - https://github.com/your-org/java-chart
+maintainers:
+  - name: Your Name
+    email: your.email@example.com 

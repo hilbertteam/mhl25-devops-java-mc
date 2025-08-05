@@ -1,0 +1,45 @@
+{{- if .Values.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "java-app.fullname" . }}
+  labels:
+    {{- include "java-app.labels" . | nindent 4 }}
+    {{- with .Values.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.podMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "java-app.selectorLabels" . | nindent 6 }}
+      {{- with .Values.podMonitor.selector.matchLabels }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- if .Values.podMonitor.namespaceSelector.matchNames }}
+  namespaceSelector:
+    {{- toYaml .Values.podMonitor.namespaceSelector | nindent 4 }}
+  {{- end }}
+  podMetricsEndpoints:
+    {{- range .Values.podMonitor.endpoints }}
+    - port: {{ .port }}
+      {{- if .path }}
+      path: {{ .path }}
+      {{- end }}
+      {{- if .interval }}
+      interval: {{ .interval }}
+      {{- end }}
+      {{- if .scrapeTimeout }}
+      scrapeTimeout: {{ .scrapeTimeout }}
+      {{- end }}
+      {{- if .honorLabels }}
+      honorLabels: {{ .honorLabels }}
+      {{- end }}
+      {{- if .honorTimestamps }}
+      honorTimestamps: {{ .honorTimestamps }}
+      {{- end }}
+    {{- end }}
+{{- end }} 
